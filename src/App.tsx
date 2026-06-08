@@ -811,10 +811,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
-  const [picks, setPicks] = useState<PickItem[]>([
-    { id: 1, quantity: 30 },
-    { id: 2, quantity: 45 },
-  ]);
+  const [picks, setPicks] = useState<PickItem[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
 
   const handleRun = async (input: { requirement: string; startDate: string; endDate: string; company: string }) => {
