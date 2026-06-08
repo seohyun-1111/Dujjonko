@@ -1,5 +1,5 @@
 // DUJJONKO · AI 스낵 큐레이션 - 단일 App 파일
-// 모든 UI 컴포넌트를 한 파일에 모아둡니다.
+// 모든 UI 컴포넌트
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Calendar,
@@ -15,13 +15,15 @@ import {
 import { mockCatalog, type PickItem, type Product } from "./mockData";
 import {
   runCuration,
+  fetchAllProducts,
+  USE_MOCK,
   type CurationResponse,
 } from "./curationApi";
 
-const BUDGET = 400000;
-
 // ---------- 유틸 ----------
 const formatKRW = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+
+const COMPANIES = ["우리자산운용", "KB자산운용", "코인원", "파크원"];
 
 // =====================================================================
 // Header
@@ -214,12 +216,13 @@ function InputSection({
   onRun,
   loading,
 }: {
-  onRun: (data: { requirement: string; startDate: string; endDate: string }) => void;
+  onRun: (data: { requirement: string; startDate: string; endDate: string; company: string }) => void;
   loading?: boolean;
 }) {
   const [requirement, setRequirement] = useState("");
   const [startDate, setStartDate] = useState("2026-03-01");
   const [endDate, setEndDate] = useState("2026-04-01");
+  const [company, setCompany] = useState("");
 
   return (
     <section className="space-y-2">
@@ -245,15 +248,30 @@ function InputSection({
               placeholder="예 : 야근이 많은 개발팀을 위해 당 충전용 간식 위주로 예산 40만 원 맞춰줘."
               className="mt-2 w-full resize-none rounded-lg border border-gray-200 p-3 text-sm text-[#000000] placeholder:text-[#949494] focus:border-black focus:outline-none"
             />
-          </div>
-          <div>
-            <label className="text-xs font-medium text-gray-700">기간</label>
-            <div className="mt-2">
-              <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
-            </div>
             <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
               모델 : ChatGPT 'gpt-5.2' / Gemini 'gemini-2.5-pro' / 외부 참조: 쿠팡, 네이버스토어, 마켓컬리, 11번가, G마켓
             </p>
+          </div>
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-gray-700">고객사</label>
+              <select
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-gray-200 p-3 text-sm text-gray-700 focus:border-black focus:outline-none"
+              >
+                <option value="">고객사를 선택하세요</option>
+                {COMPANIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-700">기간</label>
+              <div className="mt-2">
+                <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -261,7 +279,17 @@ function InputSection({
           <button
             type="button"
             disabled={loading}
-            onClick={() => onRun({ requirement, startDate, endDate })}
+            onClick={() => {
+              if (!requirement.trim()) {
+                alert("자연어 요구사항을 입력해주세요.");
+                return;
+              }
+              if (!company) {
+                alert("고객사를 선택해주세요.");
+                return;
+              }
+              onRun({ requirement, startDate, endDate, company });
+            }}
             className="rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white transition hover:bg-gray-800 disabled:opacity-50"
           >
             {loading ? "실행 중..." : "AI 큐레이션 실행"}
@@ -637,20 +665,20 @@ function MyPickSection({
 function SearchModal({
   open,
   onClose,
-  catalog,
   picks,
   onAdd,
   onRemove,
 }: {
   open: boolean;
   onClose: () => void;
-  catalog: Product[];
   picks: PickItem[];
   onAdd: (id: number, q: number) => void;
   onRemove: (id: number) => void;
 }) {
   const [keyword, setKeyword] = useState("");
   const [draftQty, setDraftQty] = useState<Record<number, string>>({});
+  const [catalog, setCatalog] = useState<Product[]>(USE_MOCK ? mockCatalog : []);
+  const [catalogLoading, setCatalogLoading] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -658,6 +686,13 @@ function SearchModal({
     setDraftQty({});
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
+    if (!USE_MOCK) {
+      setCatalogLoading(true);
+      fetchAllProducts()
+        .then(setCatalog)
+        .catch(() => setCatalog([]))
+        .finally(() => setCatalogLoading(false));
+    }
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
@@ -716,7 +751,11 @@ function SearchModal({
               </tr>
             </thead>
             <tbody>
-              {filtered.map((p) => {
+              {catalogLoading ? (
+                <tr><td colSpan={6} className="py-10 text-center text-sm text-gray-400">품목 목록 불러오는 중...</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={6} className="py-10 text-center text-sm text-gray-400">검색 결과가 없습니다.</td></tr>
+              ) : filtered.map((p) => {
                 const checked = pickedMap.has(p.id);
                 const qty = checked ? pickedMap.get(p.id)! : parseInt(draftQty[p.id] ?? "", 10) || 0;
                 return (
@@ -749,9 +788,6 @@ function SearchModal({
                   </tr>
                 );
               })}
-              {filtered.length === 0 && (
-                <tr><td colSpan={6} className="py-10 text-center text-sm text-gray-400">검색 결과가 없습니다.</td></tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -773,6 +809,7 @@ function SearchModal({
 export default function App() {
   const [data, setData] = useState<CurationResponse | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
   const [picks, setPicks] = useState<PickItem[]>([
     { id: 1, quantity: 30 },
@@ -780,11 +817,19 @@ export default function App() {
   ]);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const handleRun = async (input: { requirement: string; startDate: string; endDate: string }) => {
+  const handleRun = async (input: { requirement: string; startDate: string; endDate: string; company: string }) => {
     setLoading(true);
-    const res = await runCuration(input);
-    setData(res);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await runCuration(input);
+      setData(res);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "알 수 없는 오류가 발생했습니다.";
+      console.error("[큐레이션 API 오류]", err);
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const activeResult = data?.results.find((r) => r.rank === activeTab);
@@ -837,6 +882,12 @@ export default function App() {
       <main className="mx-auto max-w-375 space-y-10 px-6 py-10">
         <InputSection onRun={handleRun} loading={loading} />
 
+        {error && (
+          <p className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+            오류: {error}
+          </p>
+        )}
+
         {data && (
           <>
             <AnalysisSummary summary={data.summary} discussion={data.discussion} />
@@ -853,7 +904,7 @@ export default function App() {
 
               {activeResult && (
                 <>
-                  <SummaryCards total={tabTotal} budget={BUDGET} ratio={activeResult.ratio} keywords={activeResult.keywords} />
+                  <SummaryCards total={tabTotal} budget={400000} ratio={activeResult.ratio} keywords={activeResult.keywords} />
                   <ProductTable
                     products={activeResult.products}
                     pickedIds={pickedIds}
@@ -878,7 +929,6 @@ export default function App() {
       <SearchModal
         open={searchOpen}
         onClose={() => setSearchOpen(false)}
-        catalog={mockCatalog}
         picks={picks}
         onAdd={addPick}
         onRemove={removePick}
