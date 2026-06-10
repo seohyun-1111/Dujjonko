@@ -334,7 +334,7 @@ export async function runCuration(req: CurationRequest): Promise<CurationRespons
       budget: parsedBudget,
       start_date: req.startDate,
       end_date: req.endDate,
-      top_k: 5,
+      top_k: 10,
       min_qty: 10,
       max_qty: 50,
     }),

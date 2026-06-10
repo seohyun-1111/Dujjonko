@@ -23,7 +23,7 @@ import {
 // ---------- 유틸 ----------
 const formatKRW = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
-const COMPANIES = ["우리자산운용", "KB자산운용", "코인원", "파크원"];
+const COMPANIES = ["우리자산운용(37층)", "우리자산운용(44층)", "KB자산운용(18층)", "KB자산운용(32층)", "KB자산운용(40층)", "KB자산운용(41층)", "코인원", "파크원"];
 
 // =====================================================================
 // Header
@@ -639,7 +639,7 @@ function MyPickSection({
       <div className="mt-6 flex items-center justify-between">
         {items.length > 0 && shipDate ? (
           <p className="text-sm text-gray-600">
-            오늘안에 주문 시, <span className="font-bold">{shipDate}</span> 안에 출발합니다.
+            평균 <span className="font-bold">{Math.ceil((new Date(shipDate).getTime() - new Date().setHours(0,0,0,0)) / (1000 * 60 * 60 * 24))}일</span> 안에 배송됩니다.
           </p>
         ) : (
           <span />
