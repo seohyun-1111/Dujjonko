@@ -12,11 +12,11 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { mockCatalog, type PickItem, type Product } from "./mockData";
 import {
   runCuration,
   fetchAllProducts,
-  USE_MOCK,
+  type PickItem,
+  type Product,
   type CurationResponse,
 } from "./curationApi";
 
@@ -34,7 +34,7 @@ function Header() {
       <div className="mx-auto flex max-w-375 items-center justify-between px-6 py-3">
         <h1 className="text-base font-bold tracking-wider">DUJJONKO</h1>
         <div className="flex items-center gap-4 text-xs">
-          <span>코인원 박서현 님 환영합니다.</span>
+          <span>박서현 님 환영합니다.</span>
           <button
             type="button"
             aria-label="로그아웃"
@@ -595,11 +595,13 @@ function MyPickSection({
   onChangeQty,
   onRemove,
   onClearAll,
+  shipDate,
 }: {
   items: { product: Product; quantity: number }[];
   onChangeQty: (id: number, q: number) => void;
   onRemove: (id: number) => void;
   onClearAll: () => void;
+  shipDate?: string;
 }) {
   const total = items.reduce((acc, it) => acc + it.quantity * it.product.unitPrice, 0);
 
@@ -635,9 +637,9 @@ function MyPickSection({
       )}
 
       <div className="mt-6 flex items-center justify-between">
-        {items.length > 0 ? (
+        {items.length > 0 && shipDate ? (
           <p className="text-sm text-gray-600">
-            오늘안에 주문 시, <span className="font-bold">6월 5일</span> 안에 출발합니다.
+            오늘안에 주문 시, <span className="font-bold">{shipDate}</span> 안에 출발합니다.
           </p>
         ) : (
           <span />
@@ -668,31 +670,40 @@ function SearchModal({
   picks,
   onAdd,
   onRemove,
+  onCatalogLoad,
 }: {
   open: boolean;
   onClose: () => void;
   picks: PickItem[];
   onAdd: (id: number, q: number) => void;
   onRemove: (id: number) => void;
+  onCatalogLoad?: (products: Product[]) => void;
 }) {
   const [keyword, setKeyword] = useState("");
   const [draftQty, setDraftQty] = useState<Record<number, string>>({});
-  const [catalog, setCatalog] = useState<Product[]>(USE_MOCK ? mockCatalog : []);
+  const [catalog, setCatalog] = useState<Product[]>([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
 
+  // 모달이 열릴 때만 초기화 & 카탈로그 로드
   useEffect(() => {
     if (!open) return;
     setKeyword("");
     setDraftQty({});
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    setCatalogLoading(true);
+    fetchAllProducts()
+      .then((products) => {
+        setCatalog(products);
+        onCatalogLoad?.(products);
+      })
+      .catch(() => setCatalog([]))
+      .finally(() => setCatalogLoading(false));
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ESC 키 리스너 (onClose 변경에만 반응)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
-    if (!USE_MOCK) {
-      setCatalogLoading(true);
-      fetchAllProducts()
-        .then(setCatalog)
-        .catch(() => setCatalog([]))
-        .finally(() => setCatalogLoading(false));
-    }
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
@@ -711,7 +722,10 @@ function SearchModal({
       return;
     }
     const qty = parseInt(draftQty[p.id] ?? "", 10);
-    if (!qty || qty <= 0) return;
+    if (!qty || qty <= 0) {
+      alert("수량을 먼저 입력해주세요.");
+      return;
+    }
     onAdd(p.id, qty);
   };
 
@@ -813,6 +827,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<1 | 2 | 3>(1);
   const [picks, setPicks] = useState<PickItem[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchCatalog, setSearchCatalog] = useState<Product[]>([]);
 
   const handleRun = async (input: { requirement: string; startDate: string; endDate: string; company: string }) => {
     setLoading(true);
@@ -835,13 +850,13 @@ export default function App() {
     [activeResult],
   );
 
-  // id -> Product 조회
+  // id -> Product 조회 (전체 품목 검색 결과 + 큐레이션 결과)
   const productMap = useMemo(() => {
     const map = new Map<number, Product>();
-    mockCatalog.forEach((p) => map.set(p.id, p));
+    searchCatalog.forEach((p) => map.set(p.id, p));
     data?.results.flatMap((r) => r.products).forEach((p) => map.set(p.id, p));
     return map;
-  }, [data]);
+  }, [data, searchCatalog]);
 
   const pickedIds = picks.map((p) => p.id);
   const pickedItems = picks
@@ -901,7 +916,7 @@ export default function App() {
 
               {activeResult && (
                 <>
-                  <SummaryCards total={tabTotal} budget={400000} ratio={activeResult.ratio} keywords={activeResult.keywords} />
+                  <SummaryCards total={tabTotal} budget={data.budget} ratio={activeResult.ratio} keywords={activeResult.keywords} />
                   <ProductTable
                     products={activeResult.products}
                     pickedIds={pickedIds}
@@ -918,6 +933,7 @@ export default function App() {
               onChangeQty={changeQty}
               onRemove={removePick}
               onClearAll={() => setPicks([])}
+              shipDate={data.expectedShipDate}
             />
           </>
         )}
@@ -928,6 +944,7 @@ export default function App() {
         onClose={() => setSearchOpen(false)}
         picks={picks}
         onAdd={addPick}
+        onCatalogLoad={setSearchCatalog}
         onRemove={removePick}
       />
     </div>

@@ -1,25 +1,70 @@
-import {
-  mockAnalysisSummary,
-  mockCurationResults,
-  mockDiscussion,
-  type CurationResult,
-  type Product,
-} from "./mockData";
+import imgSnack from "./image/스낵.png";
+import imgDrink from "./image/음료.png";
+import imgChocolate from "./image/초콜릿.png";
+import imgJelly from "./image/젤리캔디.png";
+import imgNuts from "./image/견과건과.png";
+import imgEtc from "./image/기타.png";
+import imgRamen from "./image/라면식사.png";
+
+// ── 타입 정의 ─────────────────────────────────────────────────────────
+export type Category = "스낵" | "음료" | "초콜릿" | "젤리/캔디" | "견과/건과" | "기타" | "라면/식사";
+
+export interface Product {
+  id: number;
+  name: string;
+  category: Category;
+  quantity: number;
+  unitPrice: number;
+  taste: string;
+  sugarLevel: "낮음" | "보통" | "높음";
+  satietyLevel: "낮음" | "보통" | "높음";
+  image: string;
+}
+
+export interface CurationResult {
+  rank: 1 | 2 | 3;
+  label: string;
+  products: Product[];
+  keywords: string[];
+  ratio: string;
+}
+
+export interface PickItem {
+  id: number;
+  quantity: number;
+}
+
+interface AnalysisSummary {
+  customer: string;
+  period: string;
+  saleRows: string;
+  receipts: string;
+  totalQty: string;
+  totalRevenue: string;
+  externalItems: string;
+  warehouseData: string;
+  homeData: string;
+  snackRequests: string;
+  remainingItems: string;
+  remainingQty: string;
+}
+
+interface Discussion {
+  chatgpt: string;
+  gemini: string;
+  conclusion: string;
+  assumptions: string[];
+}
 
 // ────────────────────────────────────────────────────────────────────
 // ✅ API 주소 설정 방법 (팀원 공유용)
-// 1.
 // 프로젝트 루트(package.json 있는 위치)에 .env.local 파일을 새로 만들고
-// 아래 한 줄을 입력하세요. (파일명: .env.local)
+// 아래 한 줄을 입력하세요.
 //
 //   VITE_API_BASE_URL=http://3.34.165.158:8000
 //
 // .env.local 은 .gitignore 에 의해 git에 올라가지 않습니다.
-//
 // ────────────────────────────────────────────────────────────────────
-
-// USE_MOCK=true → mock 데이터 반환, false → 실제 API 호출
-export const USE_MOCK = false;
 
 const API_BASE: string = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? "";
 
@@ -33,9 +78,11 @@ export interface CurationRequest {
 }
 
 export interface CurationResponse {
-  summary: typeof mockAnalysisSummary;
-  discussion: typeof mockDiscussion;
+  summary: AnalysisSummary;
+  discussion: Discussion;
   results: CurationResult[];
+  budget: number;
+  expectedShipDate?: string;
 }
 
 // ── API 응답 내부 타입 ─────────────────────────────────────────────────
@@ -68,6 +115,10 @@ interface ApiOrder {
   category_summary?: Record<string, { product_count?: number; amount?: number; ratio?: number }>;
 }
 
+interface ApiShipping {
+  expected_ship_date?: string;
+}
+
 interface ApiResponse {
   query?: string;
   company?: string;
@@ -75,7 +126,53 @@ interface ApiResponse {
   section_order?: string[];
   recommendations?: Record<string, ApiRecommendItem[]>;
   order?: ApiOrder;
+  expected_ship_date?: string;
+  shipping?: ApiShipping;
   error?: string;
+}
+
+// ── 카테고리 이미지 매핑 ──────────────────────────────────────────────
+const CATEGORY_IMAGE: Record<string, string> = {
+  "스낵": imgSnack,
+  "음료": imgDrink,
+  "초콜릿": imgChocolate,
+  "젤리/캔디": imgJelly,
+  "견과/건과": imgNuts,
+  "기타": imgEtc,
+  "라면/식사": imgRamen,
+};
+
+// ── 자연어 예산 파싱 ──────────────────────────────────────────────────
+const KO_NUMBERS: Record<string, number> = {
+  일: 1, 이: 2, 삼: 3, 사: 4, 오: 5,
+  육: 6, 칠: 7, 팔: 8, 구: 9, 십: 10,
+};
+
+export function parseBudgetFromText(text: string): number | undefined {
+  // "400,000원" / "400000원"
+  const rawMatch = text.match(/(\d[\d,]*)\s*원/);
+  if (rawMatch) {
+    const val = parseInt(rawMatch[1].replace(/,/g, ""), 10);
+    if (val >= 1000) return val;
+  }
+  // "40만원" / "40만"
+  const manDigitMatch = text.match(/(\d+)\s*만\s*원?/);
+  if (manDigitMatch) return parseInt(manDigitMatch[1], 10) * 10000;
+  // "오십만원" / "사십만" 등 한글 숫자
+  const koManMatch = text.match(/([일이삼사오육칠팔구십]+)\s*만\s*원?/);
+  if (koManMatch) {
+    const chars = koManMatch[1];
+    let value = 0;
+    let tmp = 0;
+    for (const ch of chars) {
+      const n = KO_NUMBERS[ch];
+      if (ch === "십") { value += (tmp || 1) * 10; tmp = 0; }
+      else tmp = n ?? tmp;
+    }
+    value += tmp;
+    if (value > 0) return value * 10000;
+  }
+  return undefined;
 }
 
 // ── 어댑터 내부 함수 ──────────────────────────────────────────────────
@@ -85,8 +182,8 @@ const SECTION_LABELS: Record<string, string> = {
   숨은조합: "3순위(숨은 조합)",
 };
 
-function toProductImage(key: string): string {
-  return `https://picsum.photos/seed/${encodeURIComponent(key.slice(0, 80))}/80/80`;
+function toProductImage(category: string): string {
+  return CATEGORY_IMAGE[category] ?? CATEGORY_IMAGE["기타"];
 }
 
 function toFallbackId(value: string, offset: number): number {
@@ -124,7 +221,7 @@ function toProduct(
     taste: item.taste?.trim() || item.reason || "추천 API 매칭",
     sugarLevel: (sugarRaw as Product["sugarLevel"]) || "보통",
     satietyLevel: (satietyRaw as Product["satietyLevel"]) || "보통",
-    image: toProductImage(key),
+    image: toProductImage(item.category ?? "기타"),
   };
 }
 
@@ -142,6 +239,8 @@ function mapApiResponse(data: ApiResponse): CurationResponse {
   const sections = (data.section_order ?? Object.keys(data.recommendations ?? {})).slice(0, 3);
 
   return {
+    budget: data.order?.budget ?? 0,
+    expectedShipDate: data.expected_ship_date ?? data.shipping?.expected_ship_date,
     summary: {
       customer: data.company ?? "미입력",
       period: "사용자 선택 기간",
@@ -218,16 +317,13 @@ export async function fetchAllProducts(): Promise<Product[]> {
     taste: "데이터 미제공",
     sugarLevel: "보통" as const,
     satietyLevel: "보통" as const,
-    image: toProductImage(p.search_name),
+    image: toProductImage(p.category),
   }));
 }
 
 // ── 공개 함수 ─────────────────────────────────────────────────────────
 export async function runCuration(req: CurationRequest): Promise<CurationResponse> {
-  if (USE_MOCK) {
-    await new Promise<void>((resolve) => setTimeout(resolve, 400));
-    return { summary: mockAnalysisSummary, discussion: mockDiscussion, results: mockCurationResults };
-  }
+  const parsedBudget = parseBudgetFromText(req.requirement) ?? req.budget ?? 400000;
 
   const res = await fetch(`${API_BASE}/api/recommend-ai`, {
     method: "POST",
@@ -235,7 +331,9 @@ export async function runCuration(req: CurationRequest): Promise<CurationRespons
     body: JSON.stringify({
       company: req.company ?? "",
       request_text: req.requirement,
-      budget: req.budget ?? 400000,
+      budget: parsedBudget,
+      start_date: req.startDate,
+      end_date: req.endDate,
       top_k: 5,
       min_qty: 10,
       max_qty: 50,
