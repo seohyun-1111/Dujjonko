@@ -303,67 +303,96 @@ function InputSection({
 // =====================================================================
 // AnalysisSummary
 // =====================================================================
-function AnalysisSummary({
-  summary,
-  discussion,
-}: {
-  summary: CurationResponse["summary"];
-  discussion: CurationResponse["discussion"];
-}) {
-  const stats = [
-    { label: "대상 고객사", value: summary.customer },
-    { label: "분석 기간", value: summary.period },
-    { label: "판매행 수", value: summary.saleRows },
-    { label: "영수증 수", value: summary.receipts },
-    { label: "총 판매수량", value: summary.totalQty },
-    { label: "총 매출", value: summary.totalRevenue },
-    { label: "외부 참조 품목", value: summary.externalItems },
-    { label: "입고 데이터", value: summary.warehouseData },
-    { label: "출고 데이터", value: summary.homeData },
-    { label: "간식신청서", value: summary.snackRequests },
-    { label: "입출고 잔여 품목", value: summary.remainingItems },
-    { label: "입출고 잔여 수량", value: summary.remainingQty },
-  ];
+function formatPeriod(startDate: string, endDate: string): string {
+  const start = new Date(startDate + "T00:00:00");
+  const end = new Date(endDate + "T00:00:00");
+  const days = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  if (days < 7) return `약 ${days}일`;
+  if (days < 28) return `약 ${Math.round(days / 7)}주일`;
+  return `약 ${Math.round(days / 30)}개월`;
+}
 
+function AnalysisSummary({
+  company,
+  startDate,
+  endDate,
+  requirement,
+  budgetUsagePct,
+}: {
+  company: string;
+  startDate: string;
+  endDate: string;
+  requirement: string;
+  budgetUsagePct?: number;
+})
+{
+  const period = formatPeriod(startDate, endDate);
   return (
     <section className="space-y-2">
       <h2 className="text-xl font-bold">큐레이션 분석 결과</h2>
-      <p className="text-sm text-gray-500">입력하신 정보들을 바탕으로 분석된 큐레이션 결과입니다.</p>
+      <p className="text-sm text-gray-500">
+        입력하신 정보들을 바탕으로 분석된 큐레이션 결과입니다.
+      </p>
 
       <div className="mt-4 rounded-xl bg-white p-6 shadow-sm">
-        <h3 className="text-base font-semibold">분석 데이터 요약</h3>
-        <div className="mt-5 grid grid-cols-2 gap-y-5 md:grid-cols-6">
-          {stats.map((s) => (
-            <div key={s.label}>
-              <p className="text-xs text-gray-500">{s.label}</p>
-              <p className="mt-1 text-sm font-semibold">{s.value}</p>
+        <div className="grid gap-8 md:grid-cols-2">
+          {/* 왼쪽: AI 분석 */}
+          <div>
+            <h3 className="text-lg font-bold text-black">
+              AI 분석 요약
+            </h3>
+
+            <p className="mt-3 text-base leading-relaxed text-gray-700">
+              <span className="font-semibold">{company}</span>
+              의 최근 <span className="font-semibold">{period}</span> 판매 데이터를 분석하였으며,
+              자연어 요구사항과 외부 상품 정보를 기반으로 맞춤형 AI 큐레이션을 수행했습니다.
+            </p>
+
+            <h3 className="mt-5 text-lg font-bold text-black">
+              AI 토론 결과
+            </h3>
+
+            <p className="mt-2 text-base leading-relaxed text-gray-700">
+              ChatGPT가 사용자 요청과 과거 요청 벡터 검색 결과를 바탕으로 후보 상품을 선정하고,
+              Gemini가 상품 가격·재고·마진 및 카테고리 조건을 반영하여 예산 최적화를 진행했습니다.
+            </p>
+          </div>
+
+          {/* 오른쪽: 분석 조건 */}
+          <div className="border-l border-gray-200 pl-8">
+            <h3 className="text-lg font-bold text-black">
+              분석 조건 및 결과
+            </h3>
+
+            <div className="mt-4 space-y-5">
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  검색 엔진
+                </p>
+                <p className="mt-1 text-base font-semibold text-gray-900">
+                  BAAI/bge-m3 + ChromaDB/BM25 Hybrid Search
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  사용자 요청
+                </p>
+                <p className="mt-1 text-base font-semibold text-gray-900">
+                  {requirement}
+                </p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-700">
+                  예산 사용률
+                </p>
+                {/* 추후 백엔드 budgetUsagePct 연결 */}
+                <p className="mt-1 text-base font-semibold text-gray-900">
+                  {budgetUsagePct ?? 99.9}%
+                </p>
+              </div>
             </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-4 rounded-xl bg-white p-6 shadow-sm">
-        <h3 className="text-base font-semibold">토론 요약</h3>
-        <div className="mt-5 grid gap-6 md:grid-cols-2">
-          <div>
-            <p className="text-sm font-semibold">ChatGPT 초안 의견</p>
-            <p className="mt-2 text-xs leading-relaxed text-gray-600">{discussion.chatgpt}</p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold">Gemini 수정 의견</p>
-            <p className="mt-2 text-xs leading-relaxed text-gray-600">{discussion.gemini}</p>
-          </div>
-        </div>
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <div>
-            <p className="text-sm font-semibold">최종 합의 결론</p>
-            <p className="mt-2 text-xs leading-relaxed text-gray-600">{discussion.conclusion}</p>
-          </div>
-          <div>
-            <p className="text-sm font-semibold">최종 가정</p>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-gray-600">
-              {discussion.assumptions.map((a) => <li key={a}>{a}</li>)}
-            </ul>
           </div>
         </div>
       </div>
@@ -409,6 +438,7 @@ function SummaryCards({
   keywords,
 }: {
   total: number;
+  
   budget: number;
   ratio: string;
   keywords: string[];
@@ -463,7 +493,7 @@ function ProductRow({ product, index, checked, onToggle }: {
       </td>
       <td className="px-3 py-4 text-gray-700">{product.quantity}개</td>
       <td className="px-3 py-4 text-gray-700">{formatKRW(product.unitPrice)}</td>
-      <td className="px-3 py-4 font-medium">{formatKRW(product.quantity * product.unitPrice)}</td>
+      <td className="px-3 py-4 font-medium">{formatKRW(product.subtotal)}</td>
       <td className="px-3 py-4"><Pill text={product.taste} /></td>
       <td className="px-3 py-4"><Pill text={product.sugarLevel} /></td>
       <td className="px-3 py-4"><Pill text={product.satietyLevel} /></td>
@@ -828,8 +858,15 @@ export default function App() {
   const [picks, setPicks] = useState<PickItem[]>([]);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchCatalog, setSearchCatalog] = useState<Product[]>([]);
+  const [lastInput, setLastInput] = useState<{
+    requirement: string;
+    startDate: string;
+    endDate: string;
+    company: string;
+  } | null>(null);
 
   const handleRun = async (input: { requirement: string; startDate: string; endDate: string; company: string }) => {
+    setLastInput(input);
     setLoading(true);
     setError(null);
     try {
@@ -902,7 +939,14 @@ export default function App() {
 
         {data && (
           <>
-            <AnalysisSummary summary={data.summary} discussion={data.discussion} />
+            {lastInput && (
+              <AnalysisSummary
+                company={lastInput.company}
+                startDate={lastInput.startDate}
+                endDate={lastInput.endDate}
+                requirement={lastInput.requirement}
+              />
+            )}
 
             <section className="space-y-4">
               <div>

@@ -1,10 +1,18 @@
+import imgNut from "./image/견과건과.png";
+import imgEgg from "./image/계란.png";
+import imgRamenKw from "./image/라면.png";
+import imgRice from "./image/밥.png";
+import imgStrawKw from "./image/빨대.png";
+import imgSausageKw from "./image/소시지.png";
 import imgSnack from "./image/스낵.png";
 import imgDrink from "./image/음료.png";
+import imgCandy from "./image/젤리캔디.png";
 import imgChocolate from "./image/초콜릿.png";
-import imgJelly from "./image/젤리캔디.png";
-import imgNuts from "./image/견과건과.png";
+import imgCan from "./image/캔.png";
+import imgTissueKw from "./image/티슈.png";
+import imgPack from "./image/팩.png";
 import imgEtc from "./image/기타.png";
-import imgRamen from "./image/라면식사.png";
+
 
 // ── 타입 정의 ─────────────────────────────────────────────────────────
 export type Category = "스낵" | "음료" | "초콜릿" | "젤리/캔디" | "견과/건과" | "기타" | "라면/식사";
@@ -15,6 +23,7 @@ export interface Product {
   category: Category;
   quantity: number;
   unitPrice: number;
+  subtotal: number;
   taste: string;
   sugarLevel: "낮음" | "보통" | "높음";
   satietyLevel: "낮음" | "보통" | "높음";
@@ -27,6 +36,8 @@ export interface CurationResult {
   products: Product[];
   keywords: string[];
   ratio: string;
+  total: number;
+  naturalSummary?: string;
 }
 
 export interface PickItem {
@@ -83,6 +94,7 @@ export interface CurationResponse {
   results: CurationResult[];
   budget: number;
   expectedShipDate?: string;
+  deliveryMessage?: string;
 }
 
 // ── API 응답 내부 타입 ─────────────────────────────────────────────────
@@ -93,10 +105,23 @@ interface ApiRecommendItem {
   price?: number;
   stock?: number;
   quantity?: number;
+  subtotal?: number;
   taste?: string;
   sugar_level?: string;
   satiety_level?: string;
   reason?: string;
+}
+
+interface ApiSectionSummary {
+  total?: number;
+  item_count?: number;
+  budget?: number;
+  remaining_budget?: number;
+  budget_usage_pct?: number;
+  category_summary?: Record<string, { product_count?: number; amount?: number; ratio?: number }>;
+  applied_ratio?: { target_counts?: Record<string, number> } | null;
+  related_keywords?: string[];
+  natural_summary?: string;
 }
 
 interface ApiOrderItem {
@@ -115,32 +140,56 @@ interface ApiOrder {
   category_summary?: Record<string, { product_count?: number; amount?: number; ratio?: number }>;
 }
 
-interface ApiShipping {
-  expected_ship_date?: string;
-}
-
 interface ApiResponse {
   query?: string;
   company?: string;
   engine?: string;
   section_order?: string[];
   recommendations?: Record<string, ApiRecommendItem[]>;
+  section_summaries?: Record<string, ApiSectionSummary>;
+  related_keywords?: string[];
+  natural_summary?: string;
   order?: ApiOrder;
   expected_ship_date?: string;
-  shipping?: ApiShipping;
+  shipping?: { expected_ship_date?: string; delivery_message?: string };
   error?: string;
 }
 
 // ── 카테고리 이미지 매핑 ──────────────────────────────────────────────
 const CATEGORY_IMAGE: Record<string, string> = {
+  "견과/건과": imgNut,
+  "계란": imgEgg,
+  "라면/식사": imgRamenKw,
   "스낵": imgSnack,
   "음료": imgDrink,
+  "젤리/캔디": imgCandy,
   "초콜릿": imgChocolate,
-  "젤리/캔디": imgJelly,
-  "견과/건과": imgNuts,
-  "기타": imgEtc,
-  "라면/식사": imgRamen,
+  "기타": imgEtc
 };
+
+// ── 상품명 키워드 이미지 매핑 (순서대로 검색, 먼저 매칭되는 것 사용) ──────
+const NAME_KEYWORD_IMAGE: Array<{ keyword: string; image: string }> = [
+  { keyword: "견과건과", image: imgNut },
+  { keyword: "란", image: imgEgg },
+  { keyword: "달걀", image: imgEgg },
+  { keyword: "라면", image: imgRamenKw },
+  { keyword: "면", image: imgRamenKw },
+  { keyword: "캔", image: imgCan },
+  { keyword: "밥", image: imgRice },
+  { keyword: "시리얼", image: imgRice },
+  { keyword: "빨대", image: imgStrawKw },
+  { keyword: "소시지", image: imgSausageKw },
+  { keyword: "스낵", image: imgSnack },
+  { keyword: "젤리캔디", image: imgCandy },
+  { keyword: "티슈", image: imgTissueKw },
+  { keyword: "화장", image: imgTissueKw },
+  { keyword: "봉투", image: imgTissueKw },
+  { keyword: "팩", image: imgPack },
+  { keyword: "프로틴", image: imgPack },
+  { keyword: "초콜릿", image: imgChocolate },
+  { keyword: "페트", image: imgDrink },
+  { keyword: "음료", image: imgDrink },
+];
 
 // ── 자연어 예산 파싱 ──────────────────────────────────────────────────
 const KO_NUMBERS: Record<string, number> = {
@@ -182,8 +231,11 @@ const SECTION_LABELS: Record<string, string> = {
   숨은조합: "3순위(숨은 조합)",
 };
 
-function toProductImage(category: string): string {
-  return CATEGORY_IMAGE[category] ?? CATEGORY_IMAGE["기타"];
+function toProductImage(name: string, category: string): string {
+  for (const { keyword, image } of NAME_KEYWORD_IMAGE) {
+    if (name.includes(keyword)) return image;
+  }
+  return CATEGORY_IMAGE[category] ?? imgEtc;
 }
 
 function toFallbackId(value: string, offset: number): number {
@@ -194,53 +246,47 @@ function toFallbackId(value: string, offset: number): number {
   return Math.abs(hash);
 }
 
-function buildOrderLookup(order?: ApiOrder): Map<string, ApiOrderItem> {
-  const map = new Map<string, ApiOrderItem>();
-  for (const item of order?.items ?? []) {
-    const key = item.search_name || item.product_name;
-    if (key) map.set(key, item);
-  }
-  return map;
-}
-
-function toProduct(
-  item: ApiRecommendItem,
-  index: number,
-  orderLookup: Map<string, ApiOrderItem>,
-): Product {
+function toProduct(item: ApiRecommendItem, index: number): Product {
   const key = item.search_name || item.product_name || `item-${index}`;
-  const orderItem = orderLookup.get(key);
   const sugarRaw = item.sugar_level?.trim();
   const satietyRaw = item.satiety_level?.trim();
+  const qty = item.quantity ?? 0;
+  const price = item.price ?? 0;
   return {
     id: toFallbackId(key, index + 1),
     name: item.product_name || key,
     category: (item.category as Product["category"]) ?? "스낵",
-    quantity: orderItem?.quantity ?? 0,
-    unitPrice: orderItem?.price ?? item.price ?? 0,
+    quantity: qty,
+    unitPrice: price,
+    subtotal: item.subtotal ?? qty * price,
     taste: item.taste?.trim() || item.reason || "추천 API 매칭",
     sugarLevel: (sugarRaw as Product["sugarLevel"]) || "보통",
     satietyLevel: (satietyRaw as Product["satietyLevel"]) || "보통",
-    image: toProductImage(item.category ?? "기타"),
+    image: toProductImage(item.product_name ?? "", item.category ?? "기타"),
   };
 }
 
-function toRatio(order?: ApiOrder): string {
-  const summary = order?.category_summary ?? {};
-  const snack = summary["스낵"]?.amount ?? 0;
-  const drink = summary["음료"]?.amount ?? 0;
-  if (!snack && !drink) return "API 응답 기준";
-  const total = snack + drink;
-  return `${Math.round((snack / total) * 10)}:${Math.round((drink / total) * 10)}`;
+function toRatioFromSection(ss?: ApiSectionSummary): string {
+  if (ss?.applied_ratio?.target_counts) {
+    const counts = ss.applied_ratio.target_counts;
+    return Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" : ");
+  }
+  const cs = ss?.category_summary;
+  if (!cs) return "-";
+  const snack = cs["스낵"]?.product_count ?? 0;
+  const drink = cs["음료"]?.product_count ?? 0;
+  if (!snack && !drink) return "-";
+  return `스낵 ${snack} : 음료 ${drink}`;
 }
 
 function mapApiResponse(data: ApiResponse): CurationResponse {
-  const orderLookup = buildOrderLookup(data.order);
   const sections = (data.section_order ?? Object.keys(data.recommendations ?? {})).slice(0, 3);
+  const sectionSummaries = data.section_summaries ?? {};
 
   return {
     budget: data.order?.budget ?? 0,
     expectedShipDate: data.expected_ship_date ?? data.shipping?.expected_ship_date,
+    deliveryMessage: data.shipping?.delivery_message,
     summary: {
       customer: data.company ?? "미입력",
       period: "사용자 선택 기간",
@@ -278,15 +324,20 @@ function mapApiResponse(data: ApiResponse): CurationResponse {
         }%`,
       ],
     },
-    results: sections.map((section, idx) => ({
-      rank: (idx + 1) as 1 | 2 | 3,
-      label: SECTION_LABELS[section] ?? `${idx + 1}순위(${section})`,
-      products: (data.recommendations?.[section] ?? []).map((item, itemIdx) =>
-        toProduct(item, idx * 100 + itemIdx, orderLookup),
-      ),
-      keywords: [`#${data.query ?? "요청"}`, `#${section}`],
-      ratio: toRatio(data.order),
-    })),
+    results: sections.map((section, idx) => {
+      const ss = sectionSummaries[section];
+      return {
+        rank: (idx + 1) as 1 | 2 | 3,
+        label: SECTION_LABELS[section] ?? `${idx + 1}순위(${section})`,
+        products: (data.recommendations?.[section] ?? []).map((item, itemIdx) =>
+          toProduct(item, idx * 100 + itemIdx),
+        ),
+        keywords: ss?.related_keywords ?? data.related_keywords ?? [`#${data.query ?? "요청"}`, `#${section}`],
+        ratio: toRatioFromSection(ss),
+        total: ss?.total ?? 0,
+        naturalSummary: ss?.natural_summary ?? data.natural_summary,
+      };
+    }),
   };
 }
 
@@ -314,10 +365,11 @@ export async function fetchAllProducts(): Promise<Product[]> {
     category: (p.category as Product["category"]) ?? "스낵",
     quantity: 0,
     unitPrice: p.price,
+    subtotal: 0,
     taste: "데이터 미제공",
     sugarLevel: "보통" as const,
     satietyLevel: "보통" as const,
-    image: toProductImage(p.category),
+    image: toProductImage(p.product_name, p.category),
   }));
 }
 
