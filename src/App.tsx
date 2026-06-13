@@ -338,21 +338,23 @@ function AnalysisSummary({
         <div className="grid gap-8 md:grid-cols-2">
           {/* 왼쪽: AI 분석 */}
           <div>
-            <h3 className="text-lg font-bold text-black">
+            <h3 className="text-base font-semibold">
               AI 분석 요약
             </h3>
 
-            <p className="mt-3 text-base leading-relaxed text-gray-700">
-              <span className="font-semibold">{company}</span>
-              의 최근 <span className="font-semibold">{period}</span> 판매 데이터를 분석하였으며,
+            <p className="mt-3 text-sm text-gray-500 leading-relaxed">
+              <span className="text-sm text-gray-900 font-semibold">{company}</span>
+              의 최근 <span className="text-sm text-gray-900 font-semibold">{period}</span> 판매 데이터를 분석하였으며,
               자연어 요구사항과 외부 상품 정보를 기반으로 맞춤형 AI 큐레이션을 수행했습니다.
             </p>
 
-            <h3 className="mt-5 text-lg font-bold text-black">
-              AI 토론 결과
+            <h3 className="mt-7 text-base font-semibold">
+            AI 토론 결과
             </h3>
 
-            <p className="mt-2 text-base leading-relaxed text-gray-700">
+            <p className="mt-3 text-sm text-gray-500 leading-relaxed"></p>
+
+            <p className="text-sm text-gray-500 leading-relaxed">
               ChatGPT가 사용자 요청과 과거 요청 벡터 검색 결과를 바탕으로 후보 상품을 선정하고,
               Gemini가 상품 가격·재고·마진 및 카테고리 조건을 반영하여 예산 최적화를 진행했습니다.
             </p>
@@ -360,35 +362,35 @@ function AnalysisSummary({
 
           {/* 오른쪽: 분석 조건 */}
           <div className="border-l border-gray-200 pl-8">
-            <h3 className="text-lg font-bold text-black">
+            <h3 className="text-base font-semibold">
               분석 조건 및 결과
             </h3>
 
-            <div className="mt-4 space-y-5">
+            <div className="mt-3 space-y-5">
               <div>
-                <p className="text-sm font-medium text-gray-700">
-                  검색 엔진
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  - 검색 엔진
                 </p>
-                <p className="mt-1 text-base font-semibold text-gray-900">
+                <p className="text-sm font-medium text-black fleading-relaxed">
                   BAAI/bge-m3 + ChromaDB/BM25 Hybrid Search
                 </p>
               </div>
 
               <div>
-                <p className="text-sm font-medium text-gray-700">
-                  사용자 요청
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  - 사용자 요청
                 </p>
-                <p className="mt-1 text-base font-semibold text-gray-900">
+                <p className="text-sm font-medium text-black leading-relaxed">
                   {requirement}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm font-medium text-gray-700">
-                  예산 사용률
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  - 예산 사용률
                 </p>
                 {/* 추후 백엔드 budgetUsagePct 연결 */}
-                <p className="mt-1 text-base font-semibold text-gray-900">
+                <p className="text-sm font-medium text-black leading-relaxed">
                   {budgetUsagePct ?? 99.9}%
                 </p>
               </div>
@@ -447,14 +449,14 @@ function SummaryCards({
     <div className="grid gap-4 md:grid-cols-3">
       <div className="rounded-xl bg-white p-5 shadow-sm">
         <p className="text-xs text-gray-500">예상 총액</p>
-        <p className="mt-2 text-2xl font-bold">
+        <p className="mt-2 text-2xl font-semibold">
           {formatKRW(total)}{" "}
           <span className="text-xs font-normal text-gray-400">/ {formatKRW(budget)}</span>
         </p>
       </div>
       <div className="rounded-xl bg-white p-5 shadow-sm">
         <p className="text-xs text-gray-500">스낵 : 음료 비율 (비용 기준)</p>
-        <p className="mt-2 text-2xl font-bold">{ratio}</p>
+        <p className="mt-2 text-lg font-bold">{ratio}</p>
       </div>
       <div className="rounded-xl bg-white p-5 shadow-sm">
         <p className="text-xs text-gray-500">연관 키워드</p>
