@@ -119,7 +119,11 @@ interface ApiSectionSummary {
   remaining_budget?: number;
   budget_usage_pct?: number;
   category_summary?: Record<string, { product_count?: number; amount?: number; ratio?: number }>;
-  applied_ratio?: { target_counts?: Record<string, number> } | null;
+  applied_ratio?: {
+    target_counts?: Record<string, number>;
+    display_ratio?: Record<string, number>;
+    display_ratio_text?: string;
+  } | null;
   related_keywords?: string[];
   natural_summary?: string;
 }
@@ -146,12 +150,17 @@ interface ApiResponse {
   engine?: string;
   section_order?: string[];
   recommendations?: Record<string, ApiRecommendItem[]>;
+  category_grouped_recommendations?: Record<string, ApiRecommendItem[]>;
+  display_recommendations?: Record<string, ApiRecommendItem[]>;
   section_summaries?: Record<string, ApiSectionSummary>;
+  section_related_keywords?: Record<string, string[]>;
+  section_keywords?: Record<string, string[]>;
   related_keywords?: string[];
   natural_summary?: string;
   order?: ApiOrder;
   expected_ship_date?: string;
   shipping?: { expected_ship_date?: string; delivery_message?: string };
+  budget_boost?: unknown;
   error?: string;
 }
 
@@ -246,27 +255,54 @@ function toFallbackId(value: string, offset: number): number {
   return Math.abs(hash);
 }
 
+const CATEGORY_ORDER: Record<string, number> = {
+  "스낵": 0, "초콜릿": 1, "젤리/캔디": 2,
+  "견과/건과": 3, "라면/식사": 4, "음료": 5, "기타": 6,
+};
+
+function normalizeCategory(raw: string | undefined): Category {
+  if (!raw) return "기타";
+  const s = raw.trim();
+  const exact: Category[] = ["스낵", "음료", "초콜릿", "젤리/캔디", "견과/건과", "기타", "라면/식사"];
+  if (exact.includes(s as Category)) return s as Category;
+  if (/과자/.test(s)) return "스낵";
+  if (/초콜릿/.test(s)) return "초콜릿";
+  if (/젤리|캔디/.test(s)) return "젤리/캔디";
+  if (/견과|건과/.test(s)) return "견과/건과";
+  if (/라면|식사/.test(s)) return "라면/식사";
+  if (/음료/.test(s)) return "음료";
+  if (/스낵/.test(s)) return "스낵";
+  return "기타";
+}
+
 function toProduct(item: ApiRecommendItem, index: number): Product {
   const key = item.search_name || item.product_name || `item-${index}`;
   const sugarRaw = item.sugar_level?.trim();
   const satietyRaw = item.satiety_level?.trim();
   const qty = item.quantity ?? 0;
   const price = item.price ?? 0;
+  const category = normalizeCategory(item.category);
   return {
     id: toFallbackId(key, index + 1),
     name: item.product_name || key,
-    category: (item.category as Product["category"]) ?? "스낵",
+    category,
     quantity: qty,
     unitPrice: price,
     subtotal: item.subtotal ?? qty * price,
     taste: item.taste?.trim() || item.reason || "추천 API 매칭",
     sugarLevel: (sugarRaw as Product["sugarLevel"]) || "보통",
     satietyLevel: (satietyRaw as Product["satietyLevel"]) || "보통",
-    image: toProductImage(item.product_name ?? "", item.category ?? "기타"),
+    image: toProductImage(item.product_name ?? "", category),
   };
 }
 
 function toRatioFromSection(ss?: ApiSectionSummary): string {
+  if (ss?.applied_ratio?.display_ratio_text) {
+    return ss.applied_ratio.display_ratio_text;
+  }
+  if (ss?.applied_ratio?.display_ratio) {
+    return Object.entries(ss.applied_ratio.display_ratio).map(([k, v]) => `${k} ${v}`).join(" : ");
+  }
   if (ss?.applied_ratio?.target_counts) {
     const counts = ss.applied_ratio.target_counts;
     return Object.entries(counts).map(([k, v]) => `${k} ${v}`).join(" : ");
@@ -329,10 +365,10 @@ function mapApiResponse(data: ApiResponse): CurationResponse {
       return {
         rank: (idx + 1) as 1 | 2 | 3,
         label: SECTION_LABELS[section] ?? `${idx + 1}순위(${section})`,
-        products: (data.recommendations?.[section] ?? []).map((item, itemIdx) =>
-          toProduct(item, idx * 100 + itemIdx),
-        ),
-        keywords: ss?.related_keywords ?? data.related_keywords ?? [`#${data.query ?? "요청"}`, `#${section}`],
+        products: (data.display_recommendations?.[section] ?? data.category_grouped_recommendations?.[section] ?? data.recommendations?.[section] ?? [])
+          .map((item, itemIdx) => toProduct(item, idx * 100 + itemIdx))
+          .sort((a, b) => (CATEGORY_ORDER[a.category] ?? 99) - (CATEGORY_ORDER[b.category] ?? 99)),
+        keywords: ss?.related_keywords ?? data.section_related_keywords?.[section] ?? data.section_keywords?.[section] ?? data.related_keywords ?? [],
         ratio: toRatioFromSection(ss),
         total: ss?.total ?? 0,
         naturalSummary: ss?.natural_summary ?? data.natural_summary,
@@ -348,6 +384,9 @@ interface ApiProduct {
   product_name: string;
   category: string;
   price: number;
+  taste?: string;
+  sugar_level?: string;
+  satiety_level?: string;
 }
 
 interface ApiProductsResponse {
@@ -366,9 +405,9 @@ export async function fetchAllProducts(): Promise<Product[]> {
     quantity: 0,
     unitPrice: p.price,
     subtotal: 0,
-    taste: "데이터 미제공",
-    sugarLevel: "보통" as const,
-    satietyLevel: "보통" as const,
+    taste: p.taste?.trim() || "데이터 미제공",
+    sugarLevel: ((p.sugar_level?.trim() || "보통") as Product["sugarLevel"]),
+    satietyLevel: ((p.satiety_level?.trim() || "보통") as Product["satietyLevel"]),
     image: toProductImage(p.product_name, p.category),
   }));
 }

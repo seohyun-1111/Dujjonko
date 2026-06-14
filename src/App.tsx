@@ -339,7 +339,7 @@ function AnalysisSummary({
           {/* 왼쪽: AI 분석 */}
           <div>
             <h3 className="text-base font-semibold">
-              AI 분석 요약
+              AI 분석 개요
             </h3>
 
             <p className="mt-3 text-sm text-gray-500 leading-relaxed">
@@ -349,7 +349,7 @@ function AnalysisSummary({
             </p>
 
             <h3 className="mt-7 text-base font-semibold">
-            AI 토론 결과
+            AI 추천 과정
             </h3>
 
             <p className="mt-3 text-sm text-gray-500 leading-relaxed"></p>
@@ -363,34 +363,34 @@ function AnalysisSummary({
           {/* 오른쪽: 분석 조건 */}
           <div className="border-l border-gray-200 pl-8">
             <h3 className="text-base font-semibold">
-              분석 조건 및 결과
+              큐레이션 조건
             </h3>
 
             <div className="mt-3 space-y-5">
               <div>
-                <p className="text-sm text-gray-500 leading-relaxed">
+                <p className="mt-1 text-xs text-gray-500">
                   - 검색 엔진
                 </p>
-                <p className="text-sm font-medium text-black fleading-relaxed">
+                <p className="ml-2 text-sm font-medium text-black leading-relaxed">
                   BAAI/bge-m3 + ChromaDB/BM25 Hybrid Search
                 </p>
               </div>
 
               <div>
-                <p className="text-sm text-gray-500 leading-relaxed">
+                <p className="mt-1 text-xs text-gray-500">
                   - 사용자 요청
                 </p>
-                <p className="text-sm font-medium text-black leading-relaxed">
+                <p className="tml-2 text-sm font-medium text-black leading-relaxed">
                   {requirement}
                 </p>
               </div>
 
               <div>
-                <p className="text-sm text-gray-500 leading-relaxed">
+                <p className="mt-1 text-xs text-gray-500">
                   - 예산 사용률
                 </p>
                 {/* 추후 백엔드 budgetUsagePct 연결 */}
-                <p className="text-sm font-medium text-black leading-relaxed">
+                <p className="ml-2 text-sm font-medium text-black leading-relaxed">
                   {budgetUsagePct ?? 99.9}%
                 </p>
               </div>
@@ -954,7 +954,7 @@ export default function App() {
               <div>
                 <h2 className="text-xl font-bold">최종 큐레이션 리스트</h2>
                 <p className="text-sm text-gray-500">
-                  판매/입출고/간식신청서 데이터와 자연어 요구조건을 함께 반영한 큐레이션 결과입니다.
+                  판매/제품/외부 참조 데이터와 자연어 요구사항을 함께 반영한 큐레이션 결과입니다.
                 </p>
               </div>
 
