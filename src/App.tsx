@@ -271,7 +271,7 @@ function InputSection({
               </select>
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-700">기간</label>
+              <label className="text-xs font-medium text-gray-700">판매 데이터 기간</label>
               <div className="mt-2">
                 <DateRangePicker startDate={startDate} endDate={endDate} onChange={(s, e) => { setStartDate(s); setEndDate(e); }} />
               </div>
@@ -353,14 +353,13 @@ function AnalysisSummary({
             </p>
 
             <h3 className="mt-7 text-base font-semibold">
-            AI 추천 과정
+            추천 엔진 처리 결과
             </h3>
 
             <p className="mt-3 text-sm text-gray-500 leading-relaxed"></p>
 
             <p className="text-sm text-gray-500 leading-relaxed">
-              ChatGPT가 사용자 요청과 과거 요청 벡터 검색 결과를 바탕으로 후보 상품을 선정하고,
-              Gemini가 상품 가격·재고·마진 및 카테고리 조건을 반영하여 예산 최적화를 진행했습니다.
+              BGE-M3 임베딩 기반 벡터 검색과 BM25가 사용자의 자연어 요청 및 과거 큐레이션 이력을 바탕으로 후보 상품을 1차 선정하고, 이후 가격·재고·마진·카테고리 조건을 반영한 점수화 로직이 후보 상품을 재정렬하여 최종 추천 결과(기본/직접 언급/가성비/숨은 조합)와 예산 기반 주문 리스트를 산출했습니다.
             </p>
           </div>
 

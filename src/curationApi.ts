@@ -102,6 +102,8 @@ interface ApiRecommendItem {
   product_name?: string;
   search_name?: string;
   category?: string;
+  category_display?: string;
+  category_group?: string;
   price?: number;
   stock?: number;
   quantity?: number;
@@ -288,7 +290,7 @@ function toProduct(item: ApiRecommendItem, index: number): Product {
   const satietyRaw = item.satiety_level?.trim();
   const qty = item.quantity ?? 0;
   const price = item.price ?? 0;
-  const category = normalizeCategory(item.category);
+  const category = normalizeCategory(item.category_display ?? item.category);
   return {
     id: toFallbackId(key, index + 1),
     name: item.product_name || key,
@@ -372,7 +374,15 @@ function mapApiResponse(data: ApiResponse): CurationResponse {
       return {
         rank: (idx + 1) as 1 | 2 | 3,
         label: SECTION_LABELS[section] ?? `${idx + 1}순위(${section})`,
-        products: (data.display_recommendations?.[section] ?? data.category_grouped_recommendations?.[section] ?? data.recommendations?.[section] ?? [])
+        products: [...(data.display_recommendations?.[section] ?? data.category_grouped_recommendations?.[section] ?? data.recommendations?.[section] ?? [])]
+          .sort((a, b) => {
+            const groupOrder = (item: ApiRecommendItem) => {
+              const g = item.category_group;
+              if (g !== undefined && g !== null && CATEGORY_ORDER[g] !== undefined) return CATEGORY_ORDER[g];
+              return CATEGORY_ORDER[normalizeCategory(item.category_display ?? item.category)] ?? 99;
+            };
+            return groupOrder(a) - groupOrder(b);
+          })
           .map((item, itemIdx) => toProduct(item, idx * 100 + itemIdx))
           .sort((a, b) => (CATEGORY_ORDER[a.category] ?? 99) - (CATEGORY_ORDER[b.category] ?? 99)),
         keywords: ss?.related_keywords ?? data.section_related_keywords?.[section] ?? data.section_keywords?.[section] ?? data.related_keywords ?? [],
@@ -390,6 +400,8 @@ interface ApiProduct {
   search_name: string;
   product_name: string;
   category: string;
+  category_display?: string;
+  category_group?: string;
   price: number;
   taste?: string;
   sugar_level?: string;
@@ -405,18 +417,21 @@ export async function fetchAllProducts(): Promise<Product[]> {
   const res = await fetch(`${API_BASE}/api/products?limit=500`);
   const data = (await res.json()) as ApiProductsResponse;
   if (!res.ok) throw new Error("품목 목록 조회에 실패했습니다.");
-  return data.products.map((p) => ({
-    id: p.row_id,
-    name: p.product_name,
-    category: (p.category as Product["category"]) ?? "스낵",
-    quantity: 0,
-    unitPrice: p.price,
-    subtotal: 0,
-    taste: p.taste?.trim() || "데이터 미제공",
-    sugarLevel: ((p.sugar_level?.trim() || "보통") as Product["sugarLevel"]),
-    satietyLevel: ((p.satiety_level?.trim() || "보통") as Product["satietyLevel"]),
-    image: toProductImage(p.product_name, p.category),
-  }));
+  return data.products.map((p) => {
+    const category = normalizeCategory(p.category_display ?? p.category);
+    return {
+      id: p.row_id,
+      name: p.product_name,
+      category,
+      quantity: 0,
+      unitPrice: p.price,
+      subtotal: 0,
+      taste: p.taste?.trim() || "데이터 미제공",
+      sugarLevel: ((p.sugar_level?.trim() || "보통") as Product["sugarLevel"]),
+      satietyLevel: ((p.satiety_level?.trim() || "보통") as Product["satietyLevel"]),
+      image: toProductImage(p.product_name, category),
+    };
+  });
 }
 
 // ── 공개 함수 ─────────────────────────────────────────────────────────
