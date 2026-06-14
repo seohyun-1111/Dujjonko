@@ -220,8 +220,12 @@ function InputSection({
   loading?: boolean;
 }) {
   const [requirement, setRequirement] = useState("");
-  const [startDate, setStartDate] = useState("2026-03-01");
-  const [endDate, setEndDate] = useState("2026-04-01");
+  const [endDate, setEndDate] = useState(() => fmt(new Date()));
+  const [startDate, setStartDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 29);
+    return fmt(d);
+  });
   const [company, setCompany] = useState("");
 
   return (
