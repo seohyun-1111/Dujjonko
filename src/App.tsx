@@ -253,7 +253,7 @@ function InputSection({
               className="mt-2 w-full resize-none rounded-lg border border-gray-200 p-3 text-sm text-[#000000] placeholder:text-[#949494] focus:border-black focus:outline-none"
             />
             <p className="mt-2 text-[11px] leading-relaxed text-gray-500">
-              모델 : ChatGPT 'gpt-5.2' / Gemini 'gemini-2.5-pro' / 외부 참조: 쿠팡, 네이버스토어, 마켓컬리, 11번가, G마켓
+              모델 : ChatGPT, Gemini / 외부 참조: 쿠팡, 네이버스토어, 마켓컬리, 11번가, G마켓
             </p>
           </div>
           <div className="space-y-4">
@@ -375,7 +375,7 @@ function AnalysisSummary({
                   - 검색 엔진
                 </p>
                 <p className="ml-2 text-sm font-medium text-black leading-relaxed">
-                  BAAI/bge-m3 + ChromaDB/BM25 Hybrid Search
+                  BGE-M3 임베딩 + ChromaDB/BM25
                 </p>
               </div>
 
